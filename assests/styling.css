@@ -1,0 +1,26 @@
+.table-weather{
+  border: 2pxpx solid #55575D;
+  border-collapse: collapse;
+  width: 20%;
+  max-height: 500px;
+}
+
+.table-weather row{
+  border: 1px solid #55575D;
+}
+
+                                  html.Div(children= dash_table.DataTable(
+                        data=df.to_dict('records'), 
+                        columns=[{"name": i, "id": i} for i in result1.columns],
+                        
+                        style_header={ 'backgroundColor': 'rgb(0, 125, 153)','border': '1px solid green' },
+                        style_data={ 'border': '1px solid green' }, 
+                        style_cell={
+                            'backgroundColor': 'rgb(0, 125, 153)',
+                            'color': 'white',
+                            'textAlign': 'left',
+                            'whiteSpace': 'normal',
+                            'height': 'auto',
+                            },
+                        style_table={'overflowX': 'auto'},
+              )
