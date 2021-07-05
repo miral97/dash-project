@@ -6,6 +6,7 @@ import dash_bootstrap_components as dbc
 import base64
 import dash_table
 import pandas as pd
+from dash.dependencies import Input, Output, State
 
 colors = {
     'background': '#007D99'}
@@ -26,7 +27,7 @@ game_users_cols = ['name', 'game_user_id', 'shots_count',
                    'id', 'role', 'avatar', 'email']
 
 
-def get_game_users(url: str, cols: list) -> pd.DataFrame:
+def get_data(url: str) -> pd.DataFrame:
     kick_requests = requests.get(url)
     json_data = kick_requests.json()
     df = pd.DataFrame(json_data)
@@ -37,32 +38,67 @@ def get_game_users(url: str, cols: list) -> pd.DataFrame:
         response = requests.get(url)
         game_request = response.json()
         game_users_list = game_request['gameUsers']
-        if len(game_users_list) > 0:
-            game_users_data = []
-            for item in game_users_list:
-                game_users = [item['id'], item['shotsCount'], item['missedShotsCount'],
-                              item['hasNextShot'], item['user']['id'],
-                              item['user']['role'],
-                              item['user']['avatar'], item['user']['email']]
-                game_users_data.append(game_users)
-
-            result = pd.DataFrame(game_users_data)
-            result.columns = ["id", "shots_count", "missed_shots_count",
-                              "has_next_shot", "game_user_id", "role",
-                              "avatar", "email"]
-            result['name'] = game_request['name']
-            result = result[cols]
-            data.append(result)
+        shots = game_request['shots']
+        game_df = get_game_users(game_users_list, cols=["id", "shots_count", "missed_shots_count",
+                                                        "has_next_shot", "game_user_id", "role",
+                                                        "avatar", "email"])
+        if game_df.empty:
+            game_df['name'] = [game_request['name']]
         else:
-            pass
+            game_df['name'] = game_request['name']
+        game_df = game_df[['name', 'id', 'shots_count', 'missed_shots_count', 'has_next_shot',
+                           'game_user_id', 'role', 'avatar', 'email']]
+
+        shot_df = get_shots(shots, cols=['shot_id', 'experience', 'points', 'speed',
+                                         'accuracy', 'is_goal', 'video_link', 'preview_link',
+                                         'status', 'error_msg', 'created_at', 'updated_at'])
+        result = pd.concat([game_df, shot_df], axis=1)
+        data.append(result)
     final_df = pd.concat(data)
     return final_df
 
 
-url = "http://backend-test.northeurope.azurecontainer.io:4001/games?orderBy=name_ASC&limit=15"
-df = get_game_users(url, game_users_cols)
-has_next_shot = df[['name', 'id', 'has_next_shot']]
+def get_game_users(game_users: list, cols: list) -> pd.DataFrame:
+    if len(game_users) > 0:
+        game_users_data = []
+        for item in game_users:
+            game_users = [item['id'], item['shotsCount'], item['missedShotsCount'],
+                          item['hasNextShot'], item['user']['id'],
+                          item['user']['role'],
+                          item['user']['avatar'], item['user']['email']]
+            game_users_data.append(game_users)
 
+        result = pd.DataFrame(game_users_data)
+        result.columns = cols
+        return result
+    else:
+        result = pd.DataFrame(columns=cols)
+        return result
+
+
+def get_shots(shots: list, cols: list) -> pd.DataFrame:
+    if len(shots) > 0:
+        # shots are present
+        shots_data = []
+        for shot in shots:
+            game_shots = [shot['id'], shot['experience'],
+                          shot['points'], shot['speed'],
+                          shot['accuracy'], shot['isGoal'],
+                          shot['videoLink'], shot['previewLink'],
+                          shot['status'], shot['errorMsg'],
+                          shot['createdAt'], shot['updatedAt']]
+            shots_data.append(game_shots)
+        result = pd.DataFrame(shots_data)
+        result.columns = cols
+        return result
+    else:
+        result = pd.DataFrame(columns=cols)
+        return result
+
+
+url = "http://backend-test.northeurope.azurecontainer.io:4001/games?orderBy=name_ASC&limit=15"
+df = get_data(url)
+has_next_shot = df[['name', 'id', 'has_next_shot']]
 
 app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
     html.Header(children='', style={'textAlign': 'center', 'backgroundcolor': '#004d4d', 'font-weight': 'bold'}),
@@ -84,8 +120,10 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
                         html.P(
                             "See recorded video here", style={'color': 'white', 'font-weight': 'bold'},
                             className="",
-                        ), html.Iframe(src="https://www.youtube.com/embed/OQ2qYyZlqu0",
-                                       style={"height": "500px", "width": "100%"})
+                        ),
+                        html.Div(id='target', style={"height": "500px", "width": "100%"})
+                        # html.Iframe(id='video',
+                        #               style={"height": "500px", "width": "100%"})
 
                     ]
 
@@ -120,26 +158,48 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
                             "See results here", style={'color': 'white', 'font-weight': 'bold'},
                             className="",
                         ),
-                        html.Div(children=dash_table.DataTable(
-                            data=df.to_dict('records'),
-                            columns=[{"name": i, "id": i} for i in df.columns],
-                            style_header={'backgroundColor': 'rgb(0, 125, 153)', 'border': '1px solid green'},
-                            style_data={'border': '1px solid green'},
-                            style_cell={
-                                'backgroundColor': 'rgb(0, 125, 153)',
-                                'color': 'white',
-                                'textAlign': 'left',
-                                'whiteSpace': 'normal',
-                                'height': 'auto',
-                            },
-                            style_table={'overflowX': 'auto'},
-                        )
+                        html.Div(
+                            id='click-data',
+                            children=dash_table.DataTable(
+                                id='table',
+                                data=df.to_dict('records'),
+                                columns=[{"name": i, "id": i} for i in df.columns],
+                                style_header={'backgroundColor': 'rgb(0, 125, 153)', 'border': '1px solid green'},
+                                style_data={'border': '1px solid green'},
+                                style_cell={
+                                    'backgroundColor': 'rgb(0, 125, 153)',
+                                    'color': 'white',
+                                    'textAlign': 'left',
+                                    'whiteSpace': 'normal',
+                                    'height': 'auto',
+                                },
+                                style_table={'overflowX': 'auto'},
+                            )
                         )
                     ])
             )
 
         ])
 ])
+
+
+# define callback
+@app.callback(
+    Output('target', 'children'),
+    [Input('table', 'active_cell')],
+    [State('table', 'data')]
+)
+def display_click_data(active_cell, table_data):
+    if active_cell:
+        row = active_cell['row']
+        col = active_cell['column_id']
+        if col == "video_link":
+            value = table_data[row][col]
+            return html.Iframe(src=value)
+        else:
+            out = 'video not selected'
+            return out
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
