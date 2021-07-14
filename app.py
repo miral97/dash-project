@@ -34,7 +34,7 @@ def get_data(url: str) -> pd.DataFrame:
     data = []
     for index, row in df.iterrows():
         id = row['id']
-        url = f'http://backend-test.northeurope.azurecontainer.io:4001/game/{id}?orderBy=points_ASC&limit=15'
+        url = f'http://backend-test.northeurope.azurecontainer.io:4001/game/{id}?orderBy=points_ASC&limit=10'
         response = requests.get(url)
         game_request = response.json()
         game_users_list = game_request['gameUsers']
@@ -96,7 +96,7 @@ def get_shots(shots: list, cols: list) -> pd.DataFrame:
         return result
 
 
-url = "http://backend-test.northeurope.azurecontainer.io:4001/games?orderBy=name_ASC&limit=15"
+url = "http://backend-test.northeurope.azurecontainer.io:4001/games?orderBy=name_ASC&limit=10"
 df = get_data(url)
 has_next_shot = df[['name', 'id', 'has_next_shot']]
 
@@ -121,35 +121,21 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
                             "See recorded video here", style={'color': 'white', 'font-weight': 'bold'},
                             className="",
                         ),
-                        html.Div(id='target', style={"height": "500px", "width": "100%"})
+                        html.Video(src='https://sckickeracedev.blob.core.windows.net/videos/ckq9f3z5yo9m00p38qzdz5i48.mp4',
+                                   controls=True, style={"height": "500px", "width": "100%"})
+                        # html.Div(id='target', style={"height": "500px", "width": "100%"})
+                        
+                        
+                
                         # html.Iframe(id='video',
                         #               style={"height": "500px", "width": "100%"})
+                        
 
                     ]
 
                 )
             ),
-            dbc.Card(
-                dbc.CardBody(
-
-                    html.Div(children=dash_table.DataTable(
-                        data=has_next_shot.to_dict('records'),
-                        columns=[{"name": i, "id": i} for i in has_next_shot.columns],
-                        style_header={'backgroundColor': 'rgb(0, 125, 153)', 'border': '1px solid green'},
-                        style_data={'border': '1px solid green'},
-                        style_cell={
-                            'backgroundColor': 'rgb(0, 125, 153)',
-                            'color': 'white',
-                            'textAlign': 'left',
-                            'whiteSpace': 'normal',
-                            'height': 'auto',
-                        },
-                        style_table={'overflowX': 'auto'},
-                    )
-
-                    )
-                )
-            ),
+            
             dbc.Card(
                 dbc.CardBody(
                     [
